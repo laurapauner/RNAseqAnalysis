@@ -10,7 +10,7 @@ output:
 
 **DEFINICIÓN DE LOS DATOS**
 
-En primer lugar importo los datos situados en la carpeta *'Datos originales'*:
+Importación de los datos situados en la carpeta *'Datos originales'*:
 
 - targets:
 
@@ -37,13 +37,14 @@ dim(countsOriginal)
 
 
 
-Una vez importados los datos targets genero un nuevo data frame con 10 muestras aleatorias de cada grupo utilizando las funciones *'subset()'* y *'sample_n()'* tal y como se muestra a continuación:
+Genero un nuevo data frame con 10 muestras aleatorias de cada grupo:
 
 ```{r}
 require(dplyr)
 ```
 
 ```{r}
+set.seed(321)
 # NIT:
 muestrasNIT<-subset(targetsOriginal, targetsOriginal$Group=="NIT")
 muestrasNIT<-sample_n(muestrasNIT, size = 10)
@@ -58,8 +59,6 @@ muestrasSFI<-sample_n(muestrasSFI, size = 10)
 ```
 
 
-Genero un dataframe con las 10 muestras de cada grupo:
-
 ```{r}
 targets<-rbind(muestrasELI, muestrasNIT, muestrasSFI)
 dim(targets)
@@ -70,7 +69,7 @@ head(targets)
 ```
 
 
-Por último modifico los nombres de las muestras del archivo targets para que coincidan con los nombres de las muestras del archivo counts y selecciono las muestras de counts que aparecen en la variable targets de 30 muestras aleatorias generada anteriormente:
+Modifico los nombres de las muestras del archivo targets para que coincidan con los nombres de las muestras del archivo counts y selecciono las muestras de counts que aparecen en la variable targets de 30 muestras aleatorias generada anteriormente:
 
 ```{r}
 targets$Sample_Name<-gsub("-",".",targets$Sample_Name)
@@ -86,23 +85,12 @@ head(counts)
 ```
 
 
-Los nombres de las filas del archivo *'counts'* correspondientes a los transcritos de los genes en estudio contienen el identificador de Ensembl pero también el número de la versión; antes de seguir con el estudio modifico estos nombres para que se correspondan únicamente con el identificador de Ensembl:
+Modifico los nombres de las filas del archivo *'counts'* correspondientes a los transcritos de los genes para que se correspondan únicamente con el identificador de Ensembl:
 
 ```{r}
 row.names(counts)<-gsub("\\..*", "", row.names(counts))
 ```
 
-
-
-Una vez preparados los datos de trabajo es posible realizar el análisis de expresión diferencial; existen varias opciones para ello. En este caso el análisis se va a llevar a cabo mediante R con el paquete de Bioconductor *'DESeq2'*.
-
-Poseemos dos tipos de datos:
-- el archivo counts contiene el número de lecturas de cada gen. Es un dataframe con los genes en las filas y las diferentes muestras en las columnas (en este caso se han seleccionado 10 muestras de cada grupo (NIT, SFI y ELI)).
-
-- el archivo targets contiene información acerca de las muestras como por ejemplo el experimento, el nombre de la muestra, el grupo de análisis al que pertenece, la condición del experimento o el sexo del individuo del cual se extrajo la muestra.
-
-
-Para la utilización del paquete *'DESeq2'* es fundamental que los nombres de las muestras de las columnas del archivo counts coincidan con los nombres de las filas del archivo targets y que en ambos casos estén en el mismo orden; si no fuera así, funciones que se utilizarán en el análisis más adelante producirían errores. 
 
 
 Genero una matriz con la información de las muestras necesaria para el análisis de expresión diferencial; selecciono las columnas *'Group'* que contiene la información sobre la condición del experimento y *'Grupo_analisis'* que contiene información sobre el grupo de análisis al que pertenece la muestra:
@@ -121,14 +109,14 @@ Compruebo que el nombre de las filas de coldata coincide con el de las columnas 
 all(rownames(coldata)==colnames(counts))
 ```
 
-Por último guardo las tablas generadas (coldata y counts) en dos archivos de tipo 'csv'; pueden consultarse en la carpeta *'datos'*:
+Guardo las tablas generadas (coldata y counts) en dos archivos de tipo 'csv'.
 
 ```{r}
-write.table(coldata, file = "./Datos/coldata.csv", sep = ",", row.names = FALSE)
+write.table(coldata, file = "./Datos/coldata.csv", sep = ",")
 ```
 
 ```{r}
-write.table(counts, file = "./Datos/counts.csv", sep = ",", row.names = FALSE)
+write.table(counts, file = "./Datos/counts.csv", sep = ",")
 ```
 
 
@@ -136,12 +124,6 @@ write.table(counts, file = "./Datos/counts.csv", sep = ",", row.names = FALSE)
 
 **CONSTRUCCIÓN DEL OBJETO DESeqDataSet**
 
-El paquete *'DESeq2'* proporciona todas las herramientas necesarias para llevar a cabo el análisis de expresión diferencial de una forma más sencilla que con otros paquetes ya que la mayoría de funciones se han unificado; en primer lugar es necesario generar el objeto de la clase *'DESeq-DataSet'* con los datos de conteos e información sobre las muestras que actúa como input de la función *'DESeq'* en el análisis de expresión diferencial que se realizará más adelante.
-
-
-Como disponemos de la matriz de conteos, la función a utilizar para generar el objeto de clase *'DESeq-DataSet'* es *'DESeqDataSetFromMatrix()'*; además de la matriz de conteos, la función tiene como argumentos *'colData'* para introducir información acerca de las muestras y *'design'* para introducir la fórmula de diseño, en este caso en base a las distintas condiciones del experimento (Not infiltrated tissues (NIT), Small focal infiltrates (SFI), Extensive lymphoid infiltrates (ELI)). 
-
-El procedimiento se muestra a continuación:
 
 ```{r}
 library("DESeq2")
@@ -151,7 +133,7 @@ dds
 
 
 
-Observando el archivo *'counts'* generado veo que hay bastantes genes con un conteo muy bajo (0, 1, 2...); aunque la función *'DESeq'* realiza un filtrado de los genes con bajo número de lecturas voy a realizar un pre-filtrado eliminando los genes con conteos muy bajos para reducir el tamaño del objeto dds y así reducir el tiempo de cómputo.
+Realizo un pre-filtrado eliminando los genes con conteos muy bajos para reducir el tamaño del objeto dds y reducir el tiempo de cómputo.
 
 ```{r}
 keep<-rowSums(counts(dds)) >= 5
@@ -160,7 +142,7 @@ dds
 ```
 
 
-Es importante tener en cuenta que por defecto, R elige un nivel de referencia para los factores basado en el orden alfabético de los mismos; establezco como nivel de referencia la condición 'NIT' ya que corresponde a las muestras de tejidos no infiltrados:
+Establezco como nivel de referencia la condición 'NIT' ya que corresponde a las muestras de tejidos no infiltrados:
 
 ```{r}
 dds$Condition<-relevel(dds$Condition, ref = "NIT")
@@ -170,11 +152,7 @@ dds$Condition<-relevel(dds$Condition, ref = "NIT")
 
 **ANÁLISIS EXPLORATORIO Y VISUALIZACIÓN DE LOS DATOS**
 
-Llevar a cabo un primer análisis de los datos realizando diversas transformaciones de los mismos nos permite comprobar si existe algún tipo de relación entre las muestras.
-
-En el caso de análisis de RNAseq, la varianza de los datos de conteo crece con la media de los datos. Existen dos transformaciones posibles de los datos (VST, transformaciones estabilizadoras de la varianza y rlog, logaritmo regularizado) cuyo objetivo es eliminar la dependencia de la varianza de los datos con respecto a la media. En ambos casos la opción de transformación de los datos utilizada es el logaritmo.
-
-Ambas funciones de transformación devuelven un objeto de la clase *'DESeqTransform'*; en este caso utilizo la función *'vst()'* para la tranformación de los datos. Es necesario especificar *'blind = FALSE'* para que las condiciones del experimento no contribuyan a la varianza.
+Utilizo la función *'vst()'* para la tranformación de los datos:
 
 ```{r}
 vsd<-vst(dds, blind = FALSE)
@@ -195,7 +173,6 @@ meanSdPlot(assay(ntd))
 meanSdPlot(assay(vsd))
 ```
 
-Puede verse en el gráfico anterior que la desviación estándar de los datos se vuelve más constante a lo largo de todo el rango dinámico.
 
 Guardo los gráficos en la carpeta de Imagenes:
 
@@ -212,7 +189,7 @@ dev.off()
 
 
 
-Mediante la agrupación de muestras podemos obtener una visión general sobre las similitudes y diferencias entre ellas; se utiliza la función *'dist()'* para obtener la matriz de distancias:
+Mediante la agrupación de muestras podemos obtener una visión general sobre las similitudes y diferencias entre ellas.
 
 ```{r}
 sampleDists<-dist(t(assay(vsd)))
@@ -236,9 +213,8 @@ pheatmap(sampleDistMatrix,
          )
 ```
 
-Colores más verdes indican una menor distancia entre muestras y por tanto mayor similitud.
 
-Guardo el gráfico en la carpeta Imagenes:
+Guardo el gráfico en la carpeta Imágenes:
 
 ```{r}
 png("./Imagenes/pheatmapDistMatrix.png", width = 800, height = 800, res = 72, units = "px", pointsize = 12, bg = "white")
@@ -263,12 +239,11 @@ library(ggplot2)
 DESeq2::plotPCA(vsd, intgroup = c("Condition"))
 ```
 
-El primer componente representa el 62% de la variabilidad total de las muestras y como puede observarse en el gráfico anterior, la variabilidad es debida a la condición del tratamiento de infiltración al que se han sometido las muestras.
 
 Guardo el gráfico en la carpeta Imagenes:
 
 ```{r}
-png("./Imagenes/PCAplot.png", width = 1000, height = 800, res = 72, units = "px", pointsize = 12, bg = "white")
+png("./Imagenes/PCAplot.png", width = 1000, height = 800, res = 80, units = "px", pointsize = 12, bg = "white")
 DESeq2::plotPCA(vsd, intgroup = c("Condition"))
 dev.off()
 ```
@@ -278,18 +253,6 @@ dev.off()
 
 **ANÁLISIS DE EXPRESIÓN DIFERENCIAL**
 
-La función divide los conteos de cada gen en una muestra por el número total de lecturas de dicha muestra.
-
-El análisis de expresión diferencial se lleva a cabo utilizando la función *'DESeq()'* que divide los conteos de cada gen en una muestra por el número total de lecturas de dicha muestra. Los resultados pueden obtenerse con la función *'results()'*. 
-
-La función *'DESeq()'* realiza los siguientes pasos:
-
-- Normalización de los datos mediante la estimación de los tamaños de muestra y los factores de normalización.
-- Estimación de la dispersión seleccionando el valor máximo entre las estimaciones de dispersión individuales y la tendencia media de la dispersión.
-- Ajuste de los datos a un modelo lineal generalizado (GLM) binomial negativo.
-- Comprobación de la expresión diferencial de cada gen mediante la realización del Test paramétrico de Wald.
-
-------**REF 7,22**----------
 
 ```{r}
 library("DESeq")
@@ -297,7 +260,7 @@ dds<-DESeq(dds)
 ```
 
 
-La tabla de resultados se obtiene mediante la función *'results()'*; voy a generar una tabla para cada comparación para que la interpretación de los resultados sea más sencilla:
+La tabla de resultados se obtiene mediante la función *'results()'*; genero una tabla para cada comparación:
 
 - Comparación SFI vs NIT:
 
@@ -312,17 +275,6 @@ Muestro las primeras líneas de la tabla de resultados obtenida:
 ```{r}
 head(res_SFIvsNIT)
 ```
-
-La tabla de resultados contiene la siguiente información:
-
-- baseMean: promedio de las lecturas normalizadas de cada gen; equivale a la intensidad global de la expresión.
-- log2FoldChange: tasa de cambio o valor de expresión diferencial en escala logarítmica en base 2. Valores positivos equivalen a genes inducidos y valores negativos equivalen a genes reprimidos.
-- lfcSE: error estándar del log2FoldChange.
-- stat: valor estadístico principal, en este caso estadístico de Wald.
-- pvalue: p-valor; inversamente relacionado con la expresión diferencial; indica si la diferencia observada entre ambos grupos es estadísticamente significativa.
-- padj: p-valor ajustado para limitar el número de falsos positivos debido al testeo múltiple.
-
----------**REF sthda.com**---------
 
 
 - Comparación ELI vs NIT:
@@ -357,9 +309,9 @@ summary(res_ELIvsSFI, alpha = 0.05)
 
 
 
-Para ver los resultados de una forma más visual genero un *'MAplot'* que muestra los cambios en el log2FoldChange en función de la expresión media de los genes (baseMean). Para ello utilizo la función *'plotMA'*.
+Para ver los resultados de una forma más visual genero un *'MAplot'*; Para ello utilizo la función *'plotMA'*.
 
-Es útil reducir las estimaciones LFC para visualizar y ordenar los genes ya que se elimina el ruido asociado al log2FoldChange de genes con recuentos bajos; para ello utilizo la función *'lfcShrink()'*. Lo llevo a cabo para las comparaciones de los dos tratamientos de infiltración respecto al control ('Not Infiltrated Tissues').
+Reducción de las estimaciones LFC para las comparaciones de los dos tratamientos de infiltración respecto al control ('Not Infiltrated Tissues').
 
 ```{r}
 resultsNames(dds)
@@ -371,17 +323,19 @@ library(apeglm)
 ```
 
 ```{r}
-res_ELIvsNIT_LFC<-lfcShrink(dds, coef = "Condition_ELI_vs_NIT", type = "apeglm")
-```
-
-```{r}
 res_SFIvsNIT_LFC<-lfcShrink(dds, coef = "Condition_SFI_vs_NIT", type = "apeglm")
 ```
 
 
+```{r}
+res_ELIvsNIT_LFC<-lfcShrink(dds, coef = "Condition_ELI_vs_NIT", type = "apeglm")
+```
+
+
+
 Obtengo los genes significativos para cada comparación y selecciono los 10 genes con el mayor log2FoldChange en valor absoluto.
 
-Muestro los gráficos para cada comparación a continuación. 
+Muestro los gráficos para cada comparación:. 
 
 
 ```{r}
@@ -405,8 +359,8 @@ En el siguiente gráfico puede verse señalado el gen con el menor p-valor ajust
 topGeneSFIvsNIT<-rownames(res_SFIvsNIT_LFC)[which.min(res_SFIvsNIT_LFC$padj)]
 plotMA(as.data.frame(res_SFIvsNIT_LFC), ylim = c(-10,10))
 with(res_SFIvsNIT_LFC[topGeneSFIvsNIT,], {
-  points(baseMean, log2FoldChange, col = "dodgerblue", cex = 1, lwd = 2)
-  text(baseMean, log2FoldChange, topGeneSFIvsNIT, pos = 1, col = "dodgerblue")
+  points(baseMean, log2FoldChange, col = "magenta", cex = 1, lwd = 2)
+  text(baseMean, log2FoldChange, topGeneSFIvsNIT, pos = 1, col = "magenta")
 })
 ```
 
@@ -431,10 +385,10 @@ En el siguiente gráfico puede verse señalado el gen con el menor p-valor ajust
 
 ```{r}
 topGeneELIvsNIT<-rownames(res_ELIvsNIT_LFC)[which.min(res_ELIvsNIT_LFC$padj)]
-plotMA(as.data.frame(res_ELIvsNIT_LFC), ylim = c(-10,10))
+plotMA(as.data.frame(res_ELIvsNIT_LFC), ylim = c(-12,12))
 with(res_ELIvsNIT_LFC[topGeneELIvsNIT,], {
   points(baseMean, log2FoldChange, col = "dodgerblue", cex = 1, lwd = 2)
-  text(baseMean, log2FoldChange, topGeneELIvsNIT, pos = 2, col = "dodgerblue")
+  text(baseMean, log2FoldChange, topGeneELIvsNIT, pos = 1, col = "dodgerblue")
 })
 ```
 
@@ -454,46 +408,50 @@ with(res_ELIvsSFI[topGeneELIvsSFI,], {
 })
 ```
 
-En este caso no calculo la reducción de las estimaciones LFC porque no creo que aporte información esencial; podría hacerlo llevando a cabo de nuevo el desarrollo del análisis con un nivel de referencia de la condición diferente. 
 
 
 Guardo los MAplots obtenidos en la carpeta Imagenes:
 
 ```{r}
 png("./Imagenes/MAplot_SFIvsNIT.png", width = 800, height = 800, res = 72, units = "px", pointsize = 12, bg = "white")
+topGeneSFIvsNIT<-rownames((res_SFIvsNITsigOrd)[1:10,])
 plotMA(as.data.frame(res_SFIvsNIT), ylim = c(-10,10))
 with(res_SFIvsNIT[topGeneSFIvsNIT,], {
-  points(baseMean, log2FoldChange, col = "dodgerblue", cex = 1, lwd = 2)
+  points(baseMean, log2FoldChange, col = "dodgerblue", cex = 2, lwd = 3)
 })
 dev.off()
 
 png("./Imagenes/MAplot_SFIvsNIT_LFC.png", width = 800, height = 800, res = 72, units = "px", pointsize = 12, bg = "white")
+topGeneSFIvsNIT<-rownames(res_SFIvsNIT_LFC)[which.min(res_SFIvsNIT_LFC$padj)]
 plotMA(as.data.frame(res_SFIvsNIT_LFC), ylim = c(-10,10))
 with(res_SFIvsNIT_LFC[topGeneSFIvsNIT,], {
-  points(baseMean, log2FoldChange, col = "dodgerblue", cex = 1, lwd = 2)
-  text(baseMean, log2FoldChange, topGeneSFIvsNIT, pos = 1, col = "dodgerblue")
+  points(baseMean, log2FoldChange, col = "magenta", cex = 2, lwd = 3)
+  text(baseMean, log2FoldChange, topGeneSFIvsNIT, pos = 1, col = "magenta")
 })
 dev.off()
 
 png("./Imagenes/MAplot_ELIvsNIT.png", width = 800, height = 800, res = 72, units = "px", pointsize = 12, bg = "white")
+topGeneELIvsNIT<-rownames((res_ELIvsNITsigOrd)[1:10,])
 plotMA(as.data.frame(res_ELIvsNIT), ylim = c(-10,10))
 with(res_ELIvsNIT[topGeneELIvsNIT,], {
-  points(baseMean, log2FoldChange, col = "dodgerblue", cex = 1, lwd = 2)
+  points(baseMean, log2FoldChange, col = "dodgerblue", cex = 2, lwd = 3)
 })
 dev.off()
 
 png("./Imagenes/MAplot_ELIvsNIT_LFC.png", width = 800, height = 800, res = 72, units = "px", pointsize = 12, bg = "white")
-plotMA(as.data.frame(res_ELIvsNIT_LFC), ylim = c(-10,10))
+topGeneELIvsNIT<-rownames(res_ELIvsNIT_LFC)[which.min(res_ELIvsNIT_LFC$padj)]
+plotMA(as.data.frame(res_ELIvsNIT_LFC), ylim = c(-12,12))
 with(res_ELIvsNIT_LFC[topGeneELIvsNIT,], {
-  points(baseMean, log2FoldChange, col = "dodgerblue", cex = 1, lwd = 2)
+  points(baseMean, log2FoldChange, col = "dodgerblue", cex = 2, lwd = 3)
   text(baseMean, log2FoldChange, topGeneELIvsNIT, pos = 2, col = "dodgerblue")
 })
 dev.off()
 
 png("./Imagenes/MAplot_ELIvsSFI.png", width = 800, height = 800, res = 72, units = "px", pointsize = 12, bg = "white")
+topGeneELIvsSFI<-rownames((res_ELIvsSFIsigOrd)[1:10,])
 plotMA(as.data.frame(res_ELIvsSFI), ylim = c(-10,10))
 with(res_ELIvsSFI[topGeneELIvsSFI,], {
-  points(baseMean, log2FoldChange, col = "dodgerblue", cex = 1, lwd = 2)
+  points(baseMean, log2FoldChange, col = "dodgerblue", cex = 2, lwd = 3)
 })
 dev.off()
 ```
@@ -504,7 +462,7 @@ dev.off()
 
 **ANOTACIÓN DE LOS RESULTADOS**
 
-Para realizar la anotación de los genes y poder asociar los identificadores de ENSEMBLE con información sobre los mismos utilizo el paquete de anotaciones *'EnsDb.Hsapiens.v86'* (la idea original era utilizar el paquete de anotaciones *'org.Hs.eg.db'* pero al obtener un número muy bajo de mapeados se decide probar con otro paquete y el resultado obtenido es algo mejor).
+Para realizar la anotación de los genes y poder asociar los identificadores de ENSEMBLE con información sobre los mismos utilizo el paquete de anotaciones *'EnsDb.Hsapiens.v86'*:
 
 ```{r}
 library("EnsDb.Hsapiens.v86")
@@ -568,14 +526,15 @@ Guardo las tablas generadas en formato csv en la carpeta de Resultados:
 
 ```{r}
 # Comparación SFI vs NIT:
-write.table(res_SFIvsNIT, file = "./Resultados/finalSFIvsNIT.csv", sep = ",", row.names = FALSE)
+write.table(res_SFIvsNIT, file = "./Resultados/finalSFIvsNIT.csv", sep = ",")
 
 # Comparación ELI vs NIT:
-write.table(res_ELIvsNIT, file = "./Resultados/finalELIvsNIT.csv", sep = ",", row.names = FALSE)
+write.table(res_ELIvsNIT, file = "./Resultados/finalELIvsNIT.csv", sep = ",")
 
 # Comparación ELI vs SFI:
-write.table(res_ELIvsSFI, file = "./Resultados/finalELIvsSFI.csv", sep = ",", row.names = FALSE)
+write.table(res_ELIvsSFI, file = "./Resultados/finalELIvsSFI.csv", sep = ",")
 ```
+
 
 
 
@@ -656,8 +615,8 @@ SFIvsNIT_down<-SFIvsNIT_ord[SFIvsNIT_ord$log2FoldChange < 0,]
 SFIvsNIT_ord<-res_SFIvsNITsig[order(-res_SFIvsNITsig$log2FoldChange),]
 SFIvsNIT_up<-SFIvsNIT_ord[SFIvsNIT_ord$log2FoldChange > 0,]
 
-write.table(SFIvsNIT_down, file = "./Resultados/SFIvsNIT_down.csv", sep = ",", row.names = FALSE)
-write.table(SFIvsNIT_up, file = "./Resultados/SFIvsNIT_up.csv", sep = ",", row.names = FALSE)
+write.table(SFIvsNIT_down, file = "./Resultados/SFIvsNIT_down.csv", sep = ",")
+write.table(SFIvsNIT_up, file = "./Resultados/SFIvsNIT_up.csv", sep = ",")
 ```
 
 ```{r}
@@ -668,8 +627,8 @@ ELIvsNIT_down<-ELIvsNIT_ord[ELIvsNIT_ord$log2FoldChange < 0,]
 ELIvsNIT_ord<-res_ELIvsNITsig[order(-res_ELIvsNITsig$log2FoldChange),]
 ELIvsNIT_up<-ELIvsNIT_ord[ELIvsNIT_ord$log2FoldChange > 0,]
 
-write.table(ELIvsNIT_down, file = "./Resultados/ELIvsNIT_down.csv", sep = ",", row.names = FALSE)
-write.table(ELIvsNIT_up, file = "./Resultados/ELIvsNIT_up.csv", sep = ",", row.names = FALSE)
+write.table(ELIvsNIT_down, file = "./Resultados/ELIvsNIT_down.csv", sep = ",")
+write.table(ELIvsNIT_up, file = "./Resultados/ELIvsNIT_up.csv", sep = ",")
 ```
 
 ```{r}
@@ -680,8 +639,8 @@ ELIvsSFI_down<-ELIvsSFI_ord[ELIvsSFI_ord$log2FoldChange < 0,]
 ELIvsSFI_ord<-res_ELIvsSFIsig[order(-res_ELIvsSFIsig$log2FoldChange),]
 ELIvsSFI_up<-ELIvsSFI_ord[ELIvsSFI_ord$log2FoldChange > 0,]
 
-write.table(ELIvsSFI_down, file = "./Resultados/ELIvsSFI_down.csv", sep = ",", row.names = FALSE)
-write.table(ELIvsSFI_up, file = "./Resultados/ELIvsSFI_up.csv", sep = ",", row.names = FALSE)
+write.table(ELIvsSFI_down, file = "./Resultados/ELIvsSFI_down.csv", sep = ",")
+write.table(ELIvsSFI_up, file = "./Resultados/ELIvsSFI_up.csv", sep = ",")
 ```
 
 
@@ -742,9 +701,8 @@ dev.off()
 
 **COMPARACIONES MÚLTIPLES**
 
-Como se han realizado tres comparaciones distintas, es interesante saber qué genes se han seleccionado como diferencialmente expresados en cada comparación y ver así si algún gen se ha seleccionado en más de una de ellas.
 
-Para ello voy a utilizar la función *'intersect()'* del paquete *'dplyr'*.
+Voy a utilizar la función *'intersect()'* del paquete *'dplyr'*.
 
 - Genes en común entre las comparaciones "SFI vs NIT" y "ELI vs NIT":
 
@@ -754,11 +712,11 @@ length(names_SFIvsNIT_ELIvsNIT)
 ```
 
 
-Entre las comparaciones "SFI vs NIT" y "ELI vs NIT" se comparten 60 genes significativos. Algunos de estos genes son:
+Entre las comparaciones "SFI vs NIT" y "ELI vs NIT" se comparten 222 genes significativos. Algunos de estos genes son:
 
 ```{r}
-DEG_SFIvsNIT_ELIvsNIT<-res_SFIvsNITsig[names_SFIvsNIT_ELIvsNIT,]
-head(DEG_SFIvsNIT_ELIvsNIT)
+DGE_SFIvsNIT_ELIvsNIT<-res_SFIvsNITsig[names_SFIvsNIT_ELIvsNIT,]
+head(DGE_SFIvsNIT_ELIvsNIT)
 ```
 
 
@@ -769,11 +727,11 @@ names_SFIvsNIT_ELIvsSFI<-intersect(rownames(res_SFIvsNITsig), rownames(res_ELIvs
 length(names_SFIvsNIT_ELIvsSFI)
 ```
 
-Entre las comparaciones "SFI vs NIT" y "ELI vs NIT" se comparten 48 genes significativos. Algunos de estos genes son:
+Entre las comparaciones "SFI vs NIT" y "ELI vs NIT" se comparten 135 genes significativos. Algunos de estos genes son:
 
 ```{r}
-DEG_SFIvsNIT_ELIvsSFI<-res_SFIvsNITsig[names_SFIvsNIT_ELIvsSFI,]
-head(DEG_SFIvsNIT_ELIvsSFI)
+DGE_SFIvsNIT_ELIvsSFI<-res_SFIvsNITsig[names_SFIvsNIT_ELIvsSFI,]
+head(DGE_SFIvsNIT_ELIvsSFI)
 ```
 
 
@@ -784,11 +742,11 @@ names_ELIvsNIT_ELIvsSFI<-intersect(rownames(res_ELIvsNITsig), rownames(res_ELIvs
 length(names_ELIvsNIT_ELIvsSFI)
 ```
 
-Entre las comparaciones "ELI vs NIT" y "ELI vs SFI" se comparten 3130 genes significativos. Algunos de estos genes son:
+Entre las comparaciones "ELI vs NIT" y "ELI vs SFI" se comparten 2943 genes significativos. Algunos de estos genes son:
 
 ```{r}
-DEG_ELIvsNIT_ELIvsSFI<-res_ELIvsNITsig[names_ELIvsNIT_ELIvsSFI,]
-head(DEG_ELIvsNIT_ELIvsSFI)
+DGE_ELIvsNIT_ELIvsSFI<-res_ELIvsNITsig[names_ELIvsNIT_ELIvsSFI,]
+head(DGE_ELIvsNIT_ELIvsSFI)
 ```
 
 
@@ -802,21 +760,21 @@ length(names_SFIvsNIT_ELIvsNIT_ELIvsSFI)
 Entre las 3 comparaciones se comparten 3130 genes significativos. Algunos de estos genes son:
 
 ```{r}
-DEG_SFIvsNIT_ELIvsNIT_ELIvsSFI<-res_ELIvsNITsig[names_SFIvsNIT_ELIvsNIT_ELIvsSFI,]
-head(DEG_SFIvsNIT_ELIvsNIT_ELIvsSFI)
+DGE_SFIvsNIT_ELIvsNIT_ELIvsSFI<-res_ELIvsNITsig[names_SFIvsNIT_ELIvsNIT_ELIvsSFI,]
+head(DGE_SFIvsNIT_ELIvsNIT_ELIvsSFI)
 ```
 
 
 Guardo las tablas de los genes significativos compartidos por los distintos tipos de comparaciones en la carpeta de Resultados:
 
 ```{r}
-write.table(DEG_SFIvsNIT_ELIvsNIT, file = "./Resultados/DEG_SFIvsNIT_ELIvsNIT.csv", sep = ",", row.names = FALSE)
+write.table(DGE_SFIvsNIT_ELIvsNIT, file = "./Resultados/DGE_SFIvsNIT_ELIvsNIT.csv", sep = ",")
 
-write.table(DEG_SFIvsNIT_ELIvsSFI, file = "./Resultados/DEG_SFIvsNIT_ELIvsSFI.csv", sep = ",", row.names = FALSE)
+write.table(DGE_SFIvsNIT_ELIvsSFI, file = "./Resultados/DGE_SFIvsNIT_ELIvsSFI.csv", sep = ",")
 
-write.table(DEG_ELIvsNIT_ELIvsSFI, file = "./Resultados/DEG_ELIvsNIT_ELIvsSFI.csv", sep = ",", row.names = FALSE)
+write.table(DGE_ELIvsNIT_ELIvsSFI, file = "./Resultados/DGE_ELIvsNIT_ELIvsSFI.csv", sep = ",")
 
-write.table(DEG_SFIvsNIT_ELIvsNIT_ELIvsSFI, file = "./Resultados/DEG_SFIvsNIT_ELIvsNIT_ELIvsSFI.csv", sep = ",", row.names = FALSE)
+write.table(DGE_SFIvsNIT_ELIvsNIT_ELIvsSFI, file = "./Resultados/DGE_SFIvsNIT_ELIvsNIT_ELIvsSFI.csv", sep = ",")
 ```
 
 
@@ -923,7 +881,6 @@ venn.diagram(x=list(rownames(SFIvsNIT_up), rownames(ELIvsNIT_up),
 
 **SIGNIFICACIÓN BIOLÓGICA**
 
-Una vez obtenidos los genes diferencialmente expresados en las distintas comparaciones, los resultados deben interpretarse biológicamente para lo que se lleva a cabo un análisis del conjunto de genes denominado análisis de enriquecimiento básico.
 
 Voy a utilizar el paquete de Bioconductor *'clusterProfiler'*.
 
@@ -931,11 +888,11 @@ Voy a utilizar el paquete de Bioconductor *'clusterProfiler'*.
 library("clusterProfiler")
 ```
 
-El paquete permite realizar un análisis estadístico y la visualización de perfiles funcionales para genes y grupos de genes.
 
 ```{r}
 library(org.Hs.eg.db)
 ```
+
 
 
 ```{r}
@@ -956,13 +913,15 @@ write.table(egoSFIvsNIT, file = "./Resultados/egoSFIvsNIT.csv", sep = ",", row.n
 
 # Gráficos:
 png("./Imagenes/barplotSFIvsNIT.png", width = 800, height = 800, res = 72, units = "px", pointsize = 6, bg = "white")
-barplot(egoSFIvsNIT, showCategory = 15, font.size = 4, title = "SFI vs NIT Biolog. process")
+barplot(egoSFIvsNIT, showCategory = 15, font.size = 10, title = "SFI vs NIT Biological process")
 dev.off()
 
 png("./Imagenes/cnetplotSFIvsNIT.png", width = 1200, height = 820, res = 72, units = "px", pointsize = 12, bg = "white")
-cnetplot(egoSFIvsNIT, showCategory = 2, node_label = "all", foldChange = geneList_SFIvsNIT)
+cnetplot(egoSFIvsNIT, showCategory = 4, node_label = "all", foldChange = geneList_SFIvsNIT)
 dev.off()
 ```
+
+
 
 
 ```{r}
@@ -983,13 +942,14 @@ write.table(egoELIvsNIT, file = "./Resultados/egoELIvsNIT.csv", sep = ",", row.n
 
 # Gráficos:
 png("./Imagenes/barplotELIvsNIT.png", width = 800, height = 800, res = 72, units = "px", pointsize = 12, bg = "white")
-barplot(egoELIvsNIT, showCategory = 15, font.size = 4, title = "ELI vs NIT Biolog. process")
+barplot(egoELIvsNIT, showCategory = 15, font.size = 11, title = "ELI vs NIT Biological process")
 dev.off()
 
 png("./Imagenes/cnetplotELIvsNIT.png", width = 1200, height = 820, res = 72, units = "px", pointsize = 12, bg = "white")
 cnetplot(egoELIvsNIT, showCategory = 3, node_label = "all", foldChange = geneList_ELIvsNIT)
 dev.off()
 ```
+
 
 
 ```{r}
@@ -1017,17 +977,6 @@ png("./Imagenes/cnetplotELIvsSFI.png", width = 1200, height = 820, res = 72, uni
 cnetplot(egoELIvsSFI, showCategory = 3, node_label = "all", foldChange = geneList_ELIvsSFI)
 dev.off()
 ```
-
-
-
-
-
-
-
-
-
-
-
 
 
 
